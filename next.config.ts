@@ -1,7 +1,19 @@
-import type { NextConfig } from "next";
+// next.config.ts
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.pravatar.cc',
+        pathname: '/**',
+      },
+      // Add any other image hosts you use later, e.g.:
+      // { protocol: 'https', hostname: 'images.unsplash.com' },
+      // { protocol: 'https', hostname: 'res.cloudinary.com' },
+    ],
+  },
 };
 
 export default nextConfig;
