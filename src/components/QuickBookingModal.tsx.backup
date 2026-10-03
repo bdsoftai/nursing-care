@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { StaticNurse, QuickBookingInput } from '@/types';
+import { Nurse, QuickBookingInput } from '@/types';
 import { submitQuickBooking } from '@/services/bookingService';
 import { getCurrentCustomer, loginOrRegister } from '@/services/customerService';
 
 interface Props {
-  nurse: StaticNurse | null;
+  nurse: Nurse | null;
   onClose: () => void;
 }
 

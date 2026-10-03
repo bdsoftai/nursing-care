@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { STATIC_NURSES, getAllHospitals, CATEGORY_META } from '@/data/nurses';
-import { Nurse } from '@/types';
+import { StaticNurse } from '@/types';
 import QuickBookingModal from '@/components/QuickBookingModal';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useCustomer } from '@/context/CustomerContext';
@@ -13,7 +13,7 @@ export default function HomePage() {
   const [selectedArea, setSelectedArea] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedHospital, setSelectedHospital] = useState<string>('All');
-  const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
+  const [selectedNurse, setSelectedNurse] = useState<StaticNurse | null>(null);
 
   const { customer } = useCustomer();
 

@@ -1,5 +1,9 @@
-import { Customer, Booking } from '@/types';
-import { IDatabaseAdapter, CreateCustomerInput } from './types';
+import { Customer, Booking, Hospital, HospitalInput, Nurse, Admin } from '@/types';
+import {
+    IDatabaseAdapter,
+    CreateCustomerInput,
+    CreateNurseInput,
+} from './types';
 
 export class LaravelAdapter implements IDatabaseAdapter {
     private baseUrl: string;
@@ -45,7 +49,6 @@ export class LaravelAdapter implements IDatabaseAdapter {
     // ═══════════════════════════════════════════════
     // Customers
     // ═══════════════════════════════════════════════
-
     async findCustomerByPhone(phone: string): Promise<Customer | null> {
         try {
             const data = await this.request<{ customer: Customer | null }>(
@@ -96,14 +99,13 @@ export class LaravelAdapter implements IDatabaseAdapter {
                 method: 'PATCH',
             });
         } catch {
-            // silent — non-critical
+            // silent
         }
     }
 
     // ═══════════════════════════════════════════════
     // Bookings
     // ═══════════════════════════════════════════════
-
     async createBooking(
         data: Omit<Booking, 'id' | 'createdAt'>
     ): Promise<Booking> {
@@ -138,4 +140,192 @@ export class LaravelAdapter implements IDatabaseAdapter {
             return null;
         }
     }
+
+    // ═══════════════════════════════════════════════
+    // Hospitals
+    // ═══════════════════════════════════════════════
+    async getHospitals(includeInactive = false): Promise<Hospital[]> {
+        try {
+            const url = includeInactive
+                ? '/api/hospitals?all=true'
+                : '/api/hospitals';
+            const data = await this.request<{ hospitals: Hospital[] }>(url);
+            return data.hospitals ?? [];
+        } catch {
+            return [];
+        }
+    }
+
+    async getHospitalById(id: string): Promise<Hospital | null> {
+        try {
+            const data = await this.request<{ hospital: Hospital | null }>(
+                `/api/hospitals/${id}`
+            );
+            return data.hospital ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    async createHospital(
+        data: HospitalInput,
+        adminId: string
+    ): Promise<Hospital> {
+        const res = await this.request<{ hospital: Hospital }>('/api/hospitals', {
+            method: 'POST',
+            body: JSON.stringify({ ...data, adminId }),
+        });
+        return res.hospital;
+    }
+
+    async updateHospital(
+        id: string,
+        data: Partial<HospitalInput>,
+        adminId: string
+    ): Promise<Hospital> {
+        const res = await this.request<{ hospital: Hospital }>(
+            `/api/hospitals/${id}`,
+            {
+                method: 'PATCH',
+                body: JSON.stringify({ ...data, adminId }),
+            }
+        );
+        return res.hospital;
+    }
+
+    async deleteHospital(id: string, adminId: string): Promise<void> {
+        await this.request(`/api/hospitals/${id}`, {
+            method: 'DELETE',
+            body: JSON.stringify({ adminId }),
+        });
+    }
+
+    async toggleHospitalActive(
+        id: string,
+        isActive: boolean,
+        adminId: string
+    ): Promise<void> {
+        await this.request(`/api/hospitals/${id}/toggle`, {
+            method: 'POST',
+            body: JSON.stringify({ isActive, adminId }),
+        });
+    }
+
+    // ═══════════════════════════════════════════════
+    // Nurses
+    // ═══════════════════════════════════════════════
+    async getAllNurses(): Promise<Nurse[]> {
+        try {
+            const data = await this.request<{ nurses: Nurse[] }>('/api/nurses');
+            return data.nurses ?? [];
+        } catch {
+            return [];
+        }
+    }
+
+    async getNurseById(id: string): Promise<Nurse | null> {
+        try {
+            const data = await this.request<{ nurse: Nurse | null }>(
+                `/api/nurses/${id}`
+            );
+            return data.nurse ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    async getNurseByEmail(email: string): Promise<Nurse | null> {
+        try {
+            const data = await this.request<{ nurse: Nurse | null }>(
+                `/api/nurses/by-email/${encodeURIComponent(email)}`
+            );
+            return data.nurse ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    async createNurse(input: CreateNurseInput): Promise<Nurse> {
+        const res = await this.request<{ nurse: Nurse }>('/api/nurses', {
+            method: 'POST',
+            body: JSON.stringify(input),
+        });
+        return res.nurse;
+    }
+
+    async updateNurse(
+        id: string,
+        data: Partial<Nurse>,
+        adminId: string
+    ): Promise<Nurse> {
+        const res = await this.request<{ nurse: Nurse }>(`/api/nurses/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ ...data, adminId }),
+        });
+        return res.nurse;
+    }
+
+    async approveNurse(id: string, adminId: string): Promise<void> {
+        await this.request(`/api/nurses/${id}/approve`, {
+            method: 'POST',
+            body: JSON.stringify({ adminId }),
+        });
+    }
+
+    async deleteNurse(id: string, adminId: string): Promise<void> {
+        await this.request(`/api/nurses/${id}`, {
+            method: 'DELETE',
+            body: JSON.stringify({ adminId }),
+        });
+    }
+
+    // ═══════════════════════════════════════════════
+    // Categories
+    // ═══════════════════════════════════════════════
+    async getCategories(): Promise<any[]> {
+        try {
+            const data = await this.request<{ categories: any[] }>(
+                '/api/categories'
+            );
+            return data.categories ?? [];
+        } catch {
+            return [];
+        }
+    }
+
+  // ═══════════════════════════════════════════
+  // Admin — All Data
+  // ═══════════════════════════════════════════
+  async getAllCustomers(): Promise<Customer[]> {
+    try {
+      const data = await this.request<{ customers: Customer[] }>('/api/customers');
+      return data.customers ?? [];
+    } catch { return []; }
+  }
+
+  async getAllBookings(): Promise<Booking[]> {
+    try {
+      const data = await this.request<{ bookings: Booking[] }>('/api/bookings');
+      return data.bookings ?? [];
+    } catch { return []; }
+  }
+
+  // ═══════════════════════════════════════════
+  // Admins
+  // ═══════════════════════════════════════════
+  async getAdminByEmail(email: string): Promise<Admin | null> {
+    try {
+      const data = await this.request<{ admin: Admin | null }>(
+        `/api/admins/by-email/${encodeURIComponent(email)}`
+      );
+      return data.admin ?? null;
+    } catch { return null; }
+  }
+
+  async getAdminById(id: string): Promise<Admin | null> {
+    try {
+      const data = await this.request<{ admin: Admin | null }>(`/api/admins/${id}`);
+      return data.admin ?? null;
+    } catch { return null; }
+  }
 }

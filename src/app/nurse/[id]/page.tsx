@@ -5,14 +5,14 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { STATIC_NURSES } from '@/data/nurses';
-import { Nurse } from '@/types';
+import { StaticNurse } from '@/types';
 import QuickBookingModal from '@/components/QuickBookingModal';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function NurseDetailsPage() {
     const params = useParams();
     const router = useRouter();
-    const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
+    const [selectedNurse, setSelectedNurse] = useState<StaticNurse | null>(null);
 
     const nurse = STATIC_NURSES.find((n) => n.id === params.id);
 

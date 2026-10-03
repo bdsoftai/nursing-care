@@ -1,9 +1,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Customer, Booking } from '@/types';
-import { IDatabaseAdapter, CreateCustomerInput } from './types';
+import { Customer, Booking, Hospital, HospitalInput, Nurse, Admin } from '@/types';
+import {
+    IDatabaseAdapter,
+    CreateCustomerInput,
+    CreateNurseInput,
+} from './types';
 
 // ─────────────────────────────────────────────
-// Supabase Client (Server-side only)
+// Supabase Client
 // ─────────────────────────────────────────────
 function getSupabase(): SupabaseClient {
     const rawUrl = process.env.SUPABASE_URL;
@@ -13,7 +17,6 @@ function getSupabase(): SupabaseClient {
         throw new Error('Supabase environment variables missing. Check .env.local');
     }
 
-    // 🧹 URL sanitize
     let url = rawUrl.trim();
     url = url.replace(/\/rest\/v1\/?$/, '');
     url = url.replace(/\/dashboard.*$/, '');
@@ -30,6 +33,16 @@ function getSupabase(): SupabaseClient {
 // ─────────────────────────────────────────────
 // Row types
 // ─────────────────────────────────────────────
+interface AdminRow {
+    id: string;
+    admin_code: string;
+    name: string;
+    email: string;
+    password_hash: string;
+    role: string;
+    created_at: string;
+}
+
 interface CustomerRow {
     id: string;
     customer_code: string | null;
@@ -65,6 +78,44 @@ interface BookingRow {
     created_at: string;
 }
 
+interface HospitalRow {
+    id: string;
+    name: string;
+    name_en: string | null;
+    location: string | null;
+    address: string | null;
+    phone: string | null;
+    email: string | null;
+    website: string | null;
+    is_active: boolean;
+    created_by: string | null;
+    updated_by: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+interface NurseRow {
+    id: string;
+    nurse_code: string;
+    name: string;
+    phone: string;
+    email: string;
+    password_hash: string | null;
+    category_code: string | null;
+    hospital_id: string | null;
+    area: string | null;
+    address: string | null;
+    rating: number | null;
+    image_url: string | null;
+    is_approved: boolean;
+    approved_by: string | null;
+    approved_at: string | null;
+    is_available: boolean;
+    is_active: boolean | null;
+    created_at: string;
+    updated_at: string | null;
+}
+
 // ─────────────────────────────────────────────
 // Supabase Adapter
 // ─────────────────────────────────────────────
@@ -93,7 +144,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
     // ═══════════════════════════════════════════
     // Customers
     // ═══════════════════════════════════════════
-
     async findCustomerByPhone(phone: string): Promise<Customer | null> {
         const { data, error } = await this.client
             .from('customers')
@@ -128,7 +178,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
     }
 
     async createCustomer(input: CreateCustomerInput): Promise<Customer> {
-        // Generate customer code
         const customerCode = await this.generateCustomerCode();
 
         const { data, error } = await this.client
@@ -157,9 +206,31 @@ export class SupabaseAdapter implements IDatabaseAdapter {
     }
 
     // ═══════════════════════════════════════════
+    // Admin — All Data
+    // ═══════════════════════════════════════════
+    async getAllCustomers(): Promise<Customer[]> {
+        const { data, error } = await this.client
+            .from('customers')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return [];
+        return (data as CustomerRow[]).map((row) => this.mapCustomerRow(row));
+    }
+
+    async getAllBookings(): Promise<Booking[]> {
+        const { data, error } = await this.client
+            .from('bookings')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return [];
+        return (data as BookingRow[]).map((row) => this.mapBookingRow(row));
+    }
+
+    // ═══════════════════════════════════════════
     // Bookings
     // ═══════════════════════════════════════════
-
     async createBooking(
         data: Omit<Booking, 'id' | 'createdAt'>
     ): Promise<Booking> {
@@ -214,9 +285,283 @@ export class SupabaseAdapter implements IDatabaseAdapter {
     }
 
     // ═══════════════════════════════════════════
+    // Hospitals
+    // ═══════════════════════════════════════════
+    async getHospitals(includeInactive = false): Promise<Hospital[]> {
+        let query = this.client.from('hospitals').select('*');
+
+        if (!includeInactive) {
+            query = query.eq('is_active', true);
+        }
+
+        const { data, error } = await query.order('name');
+
+        if (error || !data) return [];
+        return (data as HospitalRow[]).map((row) => this.mapHospitalRow(row));
+    }
+
+    async getHospitalById(id: string): Promise<Hospital | null> {
+        const { data, error } = await this.client
+            .from('hospitals')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return this.mapHospitalRow(data as HospitalRow);
+    }
+
+    async createHospital(
+        data: HospitalInput,
+        adminId: string
+    ): Promise<Hospital> {
+        const { data: row, error } = await this.client
+            .from('hospitals')
+            .insert({
+                name: data.name.trim(),
+                name_en: data.nameEn?.trim() ?? null,
+                location: data.location?.trim() ?? null,
+                address: data.address?.trim() ?? null,
+                phone: data.phone?.trim() ?? null,
+                email: data.email?.trim() ?? null,
+                website: data.website?.trim() ?? null,
+                is_active: true,
+                created_by: adminId,
+                updated_by: adminId,
+            })
+            .select()
+            .single();
+
+        if (error) throw new Error(error.message);
+        return this.mapHospitalRow(row as HospitalRow);
+    }
+
+    async updateHospital(
+        id: string,
+        data: Partial<HospitalInput>,
+        adminId: string
+    ): Promise<Hospital> {
+        const updateData: Record<string, unknown> = {
+            updated_by: adminId,
+            updated_at: new Date().toISOString(),
+        };
+
+        if (data.name !== undefined) updateData.name = data.name.trim();
+        if (data.nameEn !== undefined)
+            updateData.name_en = data.nameEn?.trim() ?? null;
+        if (data.location !== undefined)
+            updateData.location = data.location?.trim() ?? null;
+        if (data.address !== undefined)
+            updateData.address = data.address?.trim() ?? null;
+        if (data.phone !== undefined) updateData.phone = data.phone?.trim() ?? null;
+        if (data.email !== undefined) updateData.email = data.email?.trim() ?? null;
+        if (data.website !== undefined)
+            updateData.website = data.website?.trim() ?? null;
+
+        const { data: row, error } = await this.client
+            .from('hospitals')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw new Error(error.message);
+        return this.mapHospitalRow(row as HospitalRow);
+    }
+
+    async deleteHospital(id: string, adminId: string): Promise<void> {
+        const { error } = await this.client
+            .from('hospitals')
+            .update({
+                is_active: false,
+                updated_by: adminId,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+        if (error) throw new Error(error.message);
+    }
+
+    async toggleHospitalActive(
+        id: string,
+        isActive: boolean,
+        adminId: string
+    ): Promise<void> {
+        const { error } = await this.client
+            .from('hospitals')
+            .update({
+                is_active: isActive,
+                updated_by: adminId,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+        if (error) throw new Error(error.message);
+    }
+
+    // ═══════════════════════════════════════════
+    // Nurses
+    // ═══════════════════════════════════════════
+    async getAllNurses(): Promise<Nurse[]> {
+        const { data, error } = await this.client
+            .from('nurses')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return [];
+        return (data as NurseRow[]).map((row) => this.mapNurseRow(row));
+    }
+
+    async getNurseById(id: string): Promise<Nurse | null> {
+        const { data, error } = await this.client
+            .from('nurses')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return this.mapNurseRow(data as NurseRow);
+    }
+
+    async getNurseByEmail(email: string): Promise<Nurse | null> {
+        const { data, error } = await this.client
+            .from('nurses')
+            .select('*')
+            .eq('email', email.toLowerCase().trim())
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return this.mapNurseRow(data as NurseRow);
+    }
+
+    async createNurse(input: CreateNurseInput): Promise<Nurse> {
+        const nurseCode = await this.generateNurseCode();
+
+        const { data: row, error } = await this.client
+            .from('nurses')
+            .insert({
+                nurse_code: nurseCode,
+                name: input.name.trim(),
+                phone: input.phone.trim(),
+                email: input.email.toLowerCase().trim(),
+                password_hash: input.passwordHash,
+                category_code: input.categoryCode ?? null,
+                hospital_id: input.hospitalId ?? null,
+                area: input.area ?? null,
+                address: input.address ?? null,
+                image_url: input.imageUrl ?? null,
+                is_approved: input.isApproved ?? false,
+                is_available: true,
+                is_active: true,
+            })
+            .select()
+            .single();
+
+        if (error) throw new Error(error.message);
+        return this.mapNurseRow(row as NurseRow);
+    }
+
+    async updateNurse(
+        id: string,
+        data: Partial<Nurse>,
+        adminId: string
+    ): Promise<Nurse> {
+        const updateData: Record<string, unknown> = {
+            updated_at: new Date().toISOString(),
+        };
+
+        if (data.name !== undefined) updateData.name = data.name.trim();
+        if (data.phone !== undefined) updateData.phone = data.phone.trim();
+        if (data.email !== undefined)
+            updateData.email = data.email.toLowerCase().trim();
+        if (data.categoryCode !== undefined)
+            updateData.category_code = data.categoryCode;
+        if (data.hospitalId !== undefined)
+            updateData.hospital_id = data.hospitalId;
+        if (data.area !== undefined) updateData.area = data.area;
+        if (data.address !== undefined) updateData.address = data.address;
+        if (data.rating !== undefined) updateData.rating = data.rating;
+        if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl;
+        if (data.isApproved !== undefined) {
+            updateData.is_approved = data.isApproved;
+            if (data.isApproved) {
+                updateData.approved_by = adminId;
+                updateData.approved_at = new Date().toISOString();
+            }
+        }
+        if (data.isAvailable !== undefined)
+            updateData.is_available = data.isAvailable;
+        if (data.isActive !== undefined) updateData.is_active = data.isActive;
+
+        const { data: row, error } = await this.client
+            .from('nurses')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw new Error(error.message);
+        return this.mapNurseRow(row as NurseRow);
+    }
+
+    async approveNurse(id: string, adminId: string): Promise<void> {
+        await this.updateNurse(id, { isApproved: true }, adminId);
+    }
+
+    async deleteNurse(id: string, adminId: string): Promise<void> {
+        const { error } = await this.client
+            .from('nurses')
+            .update({
+                is_active: false,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+        if (error) throw new Error(error.message);
+    }
+
+    // ═══════════════════════════════════════════
+    // Categories
+    // ═══════════════════════════════════════════
+    async getCategories(): Promise<any[]> {
+        const { data, error } = await this.client
+            .from('categories')
+            .select('*')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true });
+
+        if (error || !data) return [];
+        return data;
+    }
+
+    // ═══════════════════════════════════════════
+    // Admins
+    // ═══════════════════════════════════════════
+    async getAdminByEmail(email: string): Promise<Admin | null> {
+        const { data, error } = await this.client
+            .from('admins')
+            .select('*')
+            .eq('email', email.toLowerCase().trim())
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return this.mapAdminRow(data as AdminRow);
+    }
+
+    async getAdminById(id: string): Promise<Admin | null> {
+        const { data, error } = await this.client
+            .from('admins')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return this.mapAdminRow(data as AdminRow);
+    }
+
+    // ═══════════════════════════════════════════
     // Private helpers
     // ═══════════════════════════════════════════
-
     private async generateCustomerCode(): Promise<string> {
         const { data } = await this.client
             .from('customers')
@@ -241,6 +586,31 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         const lastCode = data?.[0]?.booking_code ?? 'BK1000';
         const num = parseInt(lastCode.replace('BK', ''), 10) + 1;
         return `BK${num}`;
+    }
+
+    private async generateNurseCode(): Promise<string> {
+        const { data } = await this.client
+            .from('nurses')
+            .select('nurse_code')
+            .not('nurse_code', 'is', null)
+            .order('nurse_code', { ascending: false })
+            .limit(1);
+
+        const lastCode = data?.[0]?.nurse_code ?? 'NUR1000';
+        const num = parseInt(lastCode.replace('NUR', ''), 10) + 1;
+        return `NUR${num}`;
+    }
+
+    private mapAdminRow(row: AdminRow): Admin {
+        return {
+            id: row.id,
+            adminCode: row.admin_code,
+            name: row.name,
+            email: row.email,
+            passwordHash: row.password_hash,
+            role: row.role as Admin['role'],
+            createdAt: row.created_at,
+        };
     }
 
     private mapCustomerRow(row: CustomerRow): Customer {
@@ -274,6 +644,46 @@ export class SupabaseAdapter implements IDatabaseAdapter {
             price: row.price ?? 0,
             status: row.status as Booking['status'],
             createdAt: row.created_at,
+        };
+    }
+
+    private mapHospitalRow(row: HospitalRow): Hospital {
+        return {
+            id: row.id,
+            name: row.name,
+            nameEn: row.name_en ?? undefined,
+            location: row.location ?? undefined,
+            address: row.address ?? undefined,
+            phone: row.phone ?? undefined,
+            email: row.email ?? undefined,
+            website: row.website ?? undefined,
+            isActive: row.is_active,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+        };
+    }
+
+    private mapNurseRow(row: NurseRow): Nurse {
+        return {
+            id: row.id,
+            nurseCode: row.nurse_code,
+            name: row.name,
+            phone: row.phone,
+            email: row.email,
+            passwordHash: row.password_hash ?? undefined,
+            categoryCode: row.category_code ?? undefined,
+            hospitalId: row.hospital_id ?? undefined,
+            area: row.area ?? undefined,
+            address: row.address ?? undefined,
+            rating: row.rating ?? 0,
+            imageUrl: row.image_url ?? undefined,
+            isApproved: row.is_approved,
+            approvedBy: row.approved_by ?? undefined,
+            approvedAt: row.approved_at ?? undefined,
+            isAvailable: row.is_available,
+            isActive: row.is_active ?? true,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at ?? undefined,
         };
     }
 }

@@ -1,9 +1,9 @@
-import { StaticNurse } from '@/types';
+import { Nurse } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════
 // 🏥 HOSPITAL-AFFILIATED NURSES (14 জন)
 // ═══════════════════════════════════════════════════════════════
-export const HOSPITAL_AFFILIATED_NURSES: StaticNurse[] = [
+export const HOSPITAL_AFFILIATED_NURSES: Nurse[] = [
     {
         id: 'nurse-101',
         name: 'মোছাঃ রেহানা পারভীন',
@@ -177,7 +177,7 @@ export const HOSPITAL_AFFILIATED_NURSES: StaticNurse[] = [
 // ═══════════════════════════════════════════════════════════════
 // 🧑‍⚕️ INDEPENDENT NURSES (13 জন)
 // ═══════════════════════════════════════════════════════════════
-export const INDEPENDENT_NURSES: StaticNurse[] = [
+export const INDEPENDENT_NURSES: Nurse[] = [
     {
         id: 'nurse-102',
         name: 'আব্দুল করিম',
@@ -326,7 +326,7 @@ export const INDEPENDENT_NURSES: StaticNurse[] = [
 // ═══════════════════════════════════════════════════════════════
 // 🏨 HOSPITAL-EXCLUSIVE NURSES (13 জন)
 // ═══════════════════════════════════════════════════════════════
-export const HOSPITAL_EXCLUSIVE_NURSES: StaticNurse[] = [
+export const HOSPITAL_EXCLUSIVE_NURSES: Nurse[] = [
     {
         id: 'nurse-103',
         name: 'মোছাঃ সুমাইয়া আক্তার',
@@ -488,7 +488,7 @@ export const HOSPITAL_EXCLUSIVE_NURSES: StaticNurse[] = [
 // ═══════════════════════════════════════════════════════════════
 // 🔗 MERGED LIST — সব নার্স একসাথে
 // ═══════════════════════════════════════════════════════════════
-export const STATIC_NURSES: StaticNurse[] = [
+export const STATIC_NURSES: Nurse[] = [
     ...HOSPITAL_AFFILIATED_NURSES,
     ...INDEPENDENT_NURSES,
     ...HOSPITAL_EXCLUSIVE_NURSES,
@@ -510,7 +510,7 @@ export const NURSES_BY_CATEGORY = {
 /** নির্দিষ্ট category-র সব নার্স return করে */
 export function getNursesByCategory(
     category: keyof typeof NURSES_BY_CATEGORY
-): StaticNurse[] {
+): Nurse[] {
     return NURSES_BY_CATEGORY[category] ?? [];
 }
 
