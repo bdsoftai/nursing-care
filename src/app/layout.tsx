@@ -3,6 +3,7 @@ import { Noto_Sans_Bengali } from 'next/font/google';
 import { CustomerProvider } from '@/context/CustomerContext';
 import { AdminProvider } from '@/context/AdminContext';    // 👈 এই ২টা line যোগ
 import './globals.css';
+import { NurseProvider } from '@/context/NurseContext';
 
 const notoBengali = Noto_Sans_Bengali({
   subsets: ['bengali', 'latin'],
@@ -24,9 +25,11 @@ export default function RootLayout({
     <html lang="bn" className={notoBengali.variable}>
       <body>
         <CustomerProvider>
-          <AdminProvider>                 {/* 👈 যোগ */}
-            {children}
-          </AdminProvider>                {/* 👈 যোগ */}
+          <AdminProvider>
+            <NurseProvider>              {/* 👈 যোগ */}
+              {children}
+            </NurseProvider>
+          </AdminProvider>
         </CustomerProvider>
       </body>
     </html>

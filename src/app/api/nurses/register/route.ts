@@ -6,15 +6,34 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
 
-        // Validation
-        if (!body.name || !body.phone || !body.email || !body.password) {
+        // ─── Validation ───
+        if (
+            !body.name?.trim() ||
+            !body.phone?.trim() ||
+            !body.email?.trim() ||
+            !body.password?.trim()
+        ) {
             return NextResponse.json(
-                { success: false, message: 'সব তথ্য দিন' },
+                { success: false, message: 'নাম, ফোন, email এবং password দিন' },
                 { status: 400 }
             );
         }
 
-        // Check existing
+        if (body.phone.trim().length < 11) {
+            return NextResponse.json(
+                { success: false, message: 'সঠিক ফোন নম্বর দিন' },
+                { status: 400 }
+            );
+        }
+
+        if (body.password.length < 6) {
+            return NextResponse.json(
+                { success: false, message: 'Password কমপক্ষে ৬ অক্ষর' },
+                { status: 400 }
+            );
+        }
+
+        // ─── Check existing email ───
         const existing = await db().getNurseByEmail(body.email);
         if (existing) {
             return NextResponse.json(
@@ -23,25 +42,37 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Create nurse (pending)
+        // ─── Hash password ───
+        const passwordHash = await hashPassword(body.password);
+
+        // ─── Create nurse (pending approval) ───
         const nurse = await db().createNurse({
-            name: body.name,
-            phone: body.phone,
-            email: body.email,
-            passwordHash: await hashPassword(body.password),
-            categoryCode: body.category_code,
-            hospitalId: body.hospital_id,
-            area: body.area,
-            address: body.address,
-            imageUrl: body.image_url,
-            isApproved: false,
+            name: body.name.trim(),
+            phone: body.phone.trim(),
+            email: body.email.toLowerCase().trim(),
+            passwordHash,
+            categoryCode: body.category_code ?? undefined,
+            hospitalId: body.hospital_id || undefined,
+            area: body.area ?? undefined,
+            address: body.address ?? undefined,
+            imageUrl: body.image_url ?? undefined,
+            isApproved: false,       // ⏳ pending
         });
 
-        return NextResponse.json({ success: true, nurse });
-    } catch (err) {
-        console.error(err);
+        console.log('✅ Nurse registered:', nurse.nurseCode);
+
+        return NextResponse.json({
+            success: true,
+            nurse,
+            message: 'রেজিস্ট্রেশন সফল — Admin approval এর অপেক্ষা করুন',
+        });
+    } catch (err: any) {
+        console.error('[/api/nurses/register]', err);
         return NextResponse.json(
-            { success: false, message: 'সার্ভার সমস্যা' },
+            {
+                success: false,
+                message: err.message ?? 'সার্ভার সমস্যা',
+            },
             { status: 500 }
         );
     }

@@ -1,4 +1,4 @@
-import { Admin, AdminLoginInput } from '@/types';
+import { Admin } from '@/types';
 
 const ADMIN_SESSION_KEY = 'nh_admin_session';
 const ADMIN_DATA_KEY = 'nh_admin_data';
@@ -28,12 +28,17 @@ export function clearAdminSession() {
     localStorage.removeItem(ADMIN_DATA_KEY);
 }
 
-export async function adminLogin(input: AdminLoginInput) {
+// 👈 Login with adminCode
+export async function adminLogin(
+    email: string,
+    password: string,
+    adminCode: string
+) {
     try {
         const res = await fetch('/api/auth/admin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(input),
+            body: JSON.stringify({ email, password, adminCode }),
         });
         const data = await res.json();
         if (!data.success || !data.admin) {

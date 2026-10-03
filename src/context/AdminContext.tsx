@@ -1,13 +1,21 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Admin, AdminLoginInput } from '@/types';
-import { adminLogin as svcLogin, adminLogout as svcLogout, getAdminSession } from '@/services/adminService';
+import { Admin } from '@/types';
+import {
+    adminLogin as svcLogin,
+    adminLogout as svcLogout,
+    getAdminSession,
+} from '@/services/adminService';
 
 interface AdminContextValue {
     admin: Admin | null;
     loading: boolean;
-    login: (input: AdminLoginInput) => Promise<{ success: boolean; message?: string }>;
+    login: (
+        email: string,
+        password: string,
+        adminCode: string
+    ) => Promise<{ success: boolean; message?: string }>;
     logout: () => void;
 }
 
@@ -22,8 +30,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         setLoading(false);
     }, []);
 
-    const login = async (input: AdminLoginInput) => {
-        const res = await svcLogin(input);
+    const login = async (email: string, password: string, adminCode: string) => {
+        const res = await svcLogin(email, password, adminCode);
         if (res.success && res.admin) {
             setAdmin(res.admin);
             return { success: true };

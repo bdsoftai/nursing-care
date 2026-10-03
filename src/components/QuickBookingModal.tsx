@@ -3,26 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { StaticNurse, QuickBookingInput } from '@/types';
+import { Nurse, QuickBookingInput } from '@/types';
 import { submitQuickBooking } from '@/services/bookingService';
 import { getCurrentCustomer, loginOrRegister } from '@/services/customerService';
 
 interface Props {
-  nurse: StaticNurse | null;
+  nurse: Nurse | null;
   onClose: () => void;
 }
 
 export default function QuickBookingModal({ nurse, onClose }: Props) {
   const router = useRouter();
 
-  // 👇 email field added
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    email: '',
-  });
-
+  const [formData, setFormData] = useState({ name: '', phone: '', address: '', email: '' });
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -34,7 +27,7 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
     if (!nurse) return;
 
     const current = getCurrentCustomer();
-    console.log('🔍 Modal opened — current customer:', current);
+    console.log('🔍 Modal opened — current customer:', current?.id ?? 'null');
 
     setCustomer(current);
 
@@ -43,7 +36,7 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
         name: current.name,
         phone: current.phone,
         address: current.address,
-        email: current.email ?? '',    // 👈 email from session
+        email: current.email ?? '',
       });
       setIsPrefilled(true);
     } else {
@@ -68,7 +61,7 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
       console.log('🔍 Step 1 — existing customer:', current?.id ?? 'null');
 
       if (!current) {
-        console.log('⚠️ No session — registering new customer...');
+        console.log('⚠️ No session — auto-registering...');
 
         const loginRes = await loginOrRegister({
           name: formData.name,
@@ -77,50 +70,51 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
           email: formData.email || undefined,
         });
 
-        console.log('🔐 Login result:', loginRes);
+        console.log('🔐 login result:', loginRes);
 
-        // ✅ Type narrowing — check + extract
         if (!loginRes.success || !loginRes.customer) {
+          console.log('❌ login FAILED');
           setLoading(false);
           setError(loginRes.message ?? 'লগইন ব্যর্থ');
           return;
         }
 
-        // ✅ TypeScript now knows loginRes.customer is Customer (not null)
+        // ✅ নতুন const-এ assign — TypeScript narrow করে
         const newCustomer = loginRes.customer;
         current = newCustomer;
 
-        console.log('✅ Step 1 DONE — customer:', newCustomer.id);
+        console.log('✅ Auto-login DONE — customer:', newCustomer.id);
 
         window.dispatchEvent(new Event('customer-updated'));
-        console.log('📢 customer-updated event fired');
       } else {
         console.log('✅ Step 1 SKIPPED — already logged in:', current.id);
       }
 
-      // ── STEP 2: Create Booking ──
+      // ── STEP 2: Create booking ──
+      console.log('📤 Step 2 — submitting booking...');
+
       const payload: QuickBookingInput = {
         patientName: formData.name,
         patientPhone: formData.phone,
         patientAddress: formData.address,
         nurseId: nurse.id,
         nurseName: nurse.name,
-        nurseImage: nurse.image,
+        nurseImage: nurse.imageUrl ?? '',
         nursePhone: nurse.phone,
       };
 
       const res = await submitQuickBooking(payload);
-      console.log('📥 Step 2 — booking result:', res);
+      console.log('📥 Booking result:', res);
 
       setLoading(false);
 
       if (res.success && res.bookingId) {
-        console.log('🎉 BOOKING SUCCESSFUL — redirecting to dashboard');
+        console.log('🎉 SUCCESS — redirecting to dashboard');
         setIsSuccess(true);
         setTimeout(() => {
           onClose();
           router.push('/dashboard');
-        }, 2000);
+        }, 1500);
       } else {
         setError(res.message ?? 'বুকিং ব্যর্থ হয়েছে');
       }
@@ -130,16 +124,17 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
       setError('কিছু ভুল হয়েছে — আবার চেষ্টা করুন');
     }
   };
+
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-900 border border-transparent dark:border-gray-800 rounded-2xl shadow-xl max-w-3xl w-full overflow-hidden transition-colors max-h-[95vh] overflow-y-auto">
         {!isSuccess ? (
           <div className="grid md:grid-cols-2">
-            {/* ─────── LEFT: Nurse Info ─────── */}
+            {/* LEFT: Nurse Info */}
             <div className="bg-blue-50 dark:bg-gray-800/60 p-6 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-blue-100 dark:border-gray-700">
               <div className="relative mb-4">
                 <Image
-                  src={nurse.image}
+                  src={nurse.imageUrl || `https://i.pravatar.cc/150?u=${nurse.id}`}
                   alt={nurse.name}
                   width={100}
                   height={100}
@@ -169,10 +164,7 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
               <div className="w-full space-y-2 text-left text-xs">
                 <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
                   <span className="shrink-0">🏷️</span>
-                  <span className="font-medium">
-                    {nurse.category}
-                    {nurse.hospitalName ? ` (${nurse.hospitalName})` : ''}
-                  </span>
+                  <span className="font-medium">{nurse.categoryCode ?? 'N/A'}</span>
                 </div>
                 <div className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
                   <span className="shrink-0">📍</span>
@@ -185,7 +177,7 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
               </div>
             </div>
 
-            {/* ─────── RIGHT: Form ─────── */}
+            {/* RIGHT: Form */}
             <div className="p-6">
               <h2 className="text-xl font-bold mb-1 text-gray-900 dark:text-gray-100">
                 দ্রুত নার্স বুক করুন
@@ -195,35 +187,22 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
               </p>
 
               {isPrefilled && customer && (
-                <div className="mb-4 p-2.5 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900 flex items-start gap-2">
-                  <span className="text-sm shrink-0">✅</span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-green-700 dark:text-green-300">
-                      স্বাগতম, {customer.name}!
-                    </p>
-                    <p className="text-[10px] text-green-600 dark:text-green-400">
-                      তথ্য অটো-ফিল হয়েছে — প্রয়োজনে এডিট করুন
-                    </p>
-                  </div>
+                <div className="mb-4 p-2.5 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900">
+                  <p className="text-[11px] font-semibold text-green-700 dark:text-green-300">
+                    স্বাগতম, {customer.name}!
+                  </p>
                 </div>
               )}
 
               {!customer && (
-                <div className="mb-4 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 flex items-start gap-2">
-                  <span className="text-sm shrink-0">ℹ️</span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
-                      প্রথমবার? সমস্যা নেই!
-                    </p>
-                    <p className="text-[10px] text-blue-600 dark:text-blue-400">
-                      তথ্য দিন — স্বয়ংক্রিয়ভাবে অ্যাকাউন্ট তৈরি হবে
-                    </p>
-                  </div>
+                <div className="mb-4 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900">
+                  <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                    প্রথমবার? তথ্য দিন — অ্যাকাউন্ট স্বয়ংক্রিয় তৈরি হবে
+                  </p>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* ─── Name ─── */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     আপনার নাম
@@ -231,16 +210,13 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
                   <input
                     required
                     type="text"
-                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="যেমন: রহিম চৌধুরী"
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
 
-                {/* ─── Phone ─── */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     মোবাইল নম্বর
@@ -248,16 +224,13 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
                   <input
                     required
                     type="tel"
-                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="017XXXXXXXX"
                     value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   />
                 </div>
 
-                {/* ─── Address ─── */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     বর্তমান ঠিকানা
@@ -265,36 +238,24 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
                   <textarea
                     required
                     rows={2}
-                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors resize-none"
+                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                     placeholder="বাসা নম্বর, রোড, এলাকা"
                     value={formData.address}
-                    onChange={(e) =>
-                      setFormData({ ...formData, address: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   />
                 </div>
 
-                {/* ─── Email (Optional) 👈 NEW ─── */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Email{' '}
-                    <span className="text-gray-400 text-xs font-normal">
-                      (optional)
-                    </span>
+                    Email <span className="text-gray-400 text-xs">(optional)</span>
                   </label>
                   <input
                     type="email"
-                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                    className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="you@example.com"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    📧 Email দিলে পরে password recovery করতে পারবেন। না দিলে
-                    শুধু phone দিয়েই login থাকবে।
-                  </p>
                 </div>
 
                 {error && (
@@ -307,14 +268,14 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-1/2 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    className="w-1/2 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
                     বাতিল
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-1/2 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 dark:hover:bg-blue-500 disabled:bg-blue-300 dark:disabled:bg-blue-900 disabled:cursor-not-allowed transition-colors"
+                    className="w-1/2 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-blue-300"
                   >
                     {loading ? 'প্রসেস হচ্ছে...' : 'বুকিং কনফার্ম'}
                   </button>
@@ -323,39 +284,13 @@ export default function QuickBookingModal({ nurse, onClose }: Props) {
             </div>
           </div>
         ) : (
-          /* ─────── SUCCESS ─────── */
           <div className="text-center py-10 px-6">
             <div className="text-5xl mb-3">🎉</div>
             <h3 className="text-xl font-bold text-green-600 dark:text-green-400 mb-2">
               বুকিং সফল হয়েছে!
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               আমাদের প্রতিনিধি শীঘ্রই আপনার সাথে যোগাযোগ করবেন।
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
-              <button
-                onClick={() => {
-                  onClose();
-                  router.push('/dashboard');
-                }}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-              >
-                📋 আমার ড্যাশবোর্ড
-              </button>
-              <button
-                onClick={() => {
-                  onClose();
-                  router.push('/');
-                }}
-                className="flex-1 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                🏠 হোমে ফিরুন
-              </button>
-            </div>
-
-            <p className="text-[10px] text-gray-400 mt-4">
-              ২ সেকেন্ডের মধ্যে স্বয়ংক্রিয়ভাবে ড্যাশবোর্ডে যাবে...
             </p>
           </div>
         )}

@@ -5,16 +5,38 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { STATIC_NURSES } from '@/data/nurses';
-import { StaticNurse } from '@/types';
+import { Nurse } from '@/types';
 import QuickBookingModal from '@/components/QuickBookingModal';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function NurseDetailsPage() {
     const params = useParams();
     const router = useRouter();
-    const [selectedNurse, setSelectedNurse] = useState<StaticNurse | null>(null);
+    const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
 
-    const nurse = STATIC_NURSES.find((n) => n.id === params.id);
+    // Static data থেকে nurse খুঁজুন
+    const staticNurse = STATIC_NURSES.find((n) => n.id === params.id);
+
+    // StaticNurse → Nurse type-এ convert
+    const nurse: Nurse | null = staticNurse
+        ? {
+            id: staticNurse.id,
+            nurseCode: staticNurse.id,
+            name: staticNurse.name,
+            phone: staticNurse.phone,
+            email: '',
+            categoryCode: staticNurse.category,
+            hospitalId: staticNurse.hospitalName,
+            area: staticNurse.area,
+            address: staticNurse.address,
+            rating: staticNurse.rating,
+            imageUrl: staticNurse.image,
+            isApproved: true,
+            isAvailable: staticNurse.isAvailable,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+        }
+        : null;
 
     // ── Not found ──
     if (!nurse) {
@@ -24,7 +46,10 @@ export default function NurseDetailsPage() {
                     <p className="text-6xl mb-4">🔍</p>
                     <h1 className="text-2xl font-bold mb-2">নার্স খুঁজে পাওয়া যায়নি</h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                        আইডি: <code className="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{String(params.id)}</code>
+                        আইডি:{' '}
+                        <code className="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                            {String(params.id)}
+                        </code>
                     </p>
                     <Link
                         href="/"
@@ -43,7 +68,7 @@ export default function NurseDetailsPage() {
 
     return (
         <main className="max-w-5xl mx-auto p-4 min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors">
-            {/* ─────────────── Header ─────────────── */}
+            {/* Header */}
             <header className="flex justify-between items-center mb-6">
                 <button
                     onClick={() => router.back()}
@@ -54,20 +79,22 @@ export default function NurseDetailsPage() {
                 <ThemeToggle />
             </header>
 
-            {/* ─────────────── Hero Card ─────────────── */}
+            {/* Hero Card */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm mb-6">
                 <div className="grid md:grid-cols-3 gap-0">
                     {/* Left: Image */}
                     <div className="relative w-full aspect-square md:aspect-auto md:min-h-[320px] bg-gray-100 dark:bg-gray-800">
                         <Image
-                            src={nurse.image}
+                            src={
+                                nurse.imageUrl ||
+                                `https://i.pravatar.cc/150?u=${nurse.id}`
+                            }
                             alt={nurse.name}
                             fill
                             sizes="(max-width: 768px) 100vw, 33vw"
                             className="object-cover"
-                            priority
+                            preload
                         />
-                        {/* Availability badge */}
                         <span
                             className={`absolute top-4 left-4 text-xs px-3 py-1 rounded-full font-semibold shadow ${nurse.isAvailable
                                     ? 'bg-green-500 text-white'
@@ -93,18 +120,33 @@ export default function NurseDetailsPage() {
 
                             {/* Info Grid */}
                             <div className="grid sm:grid-cols-2 gap-3 mb-6">
-                                <InfoRow icon="🏷️" label="ধরন" value={nurse.category} accent="purple" />
+                                <InfoRow
+                                    icon="🏷️"
+                                    label="ধরন"
+                                    value={nurse.categoryCode ?? 'N/A'}
+                                    accent="purple"
+                                />
                                 <InfoRow
                                     icon="🏥"
                                     label="হাসপাতাল"
-                                    value={nurse.hospitalName ?? 'ফ্রিল্যান্স নার্স'}
+                                    value={nurse.hospitalId ?? 'ফ্রিল্যান্স নার্স'}
                                     accent="teal"
                                 />
-                                <InfoRow icon="📍" label="এলাকা" value={nurse.area} accent="blue" />
-                                <InfoRow icon="📞" label="ফোন" value={nurse.phone} accent="green" />
+                                <InfoRow
+                                    icon="📍"
+                                    label="এলাকা"
+                                    value={nurse.area ?? 'N/A'}
+                                    accent="blue"
+                                />
+                                <InfoRow
+                                    icon="📞"
+                                    label="ফোন"
+                                    value={nurse.phone}
+                                    accent="green"
+                                />
                             </div>
 
-                            {/* Address block */}
+                            {/* Address */}
                             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 mb-6">
                                 <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
                                     📌 সম্পূর্ণ ঠিকানা
@@ -115,7 +157,7 @@ export default function NurseDetailsPage() {
                             </div>
                         </div>
 
-                        {/* Action Buttons */}
+                        {/* Actions */}
                         <div className="flex flex-col sm:flex-row gap-3">
                             <a
                                 href={whatsappLink}
@@ -136,7 +178,7 @@ export default function NurseDetailsPage() {
                 </div>
             </div>
 
-            {/* ─────────────── Info Sections ─────────────── */}
+            {/* Info Sections */}
             <div className="grid md:grid-cols-2 gap-4 mb-6">
                 {/* About */}
                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
@@ -144,12 +186,19 @@ export default function NurseDetailsPage() {
                         ℹ️ পরিচিতি
                     </h2>
                     <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                        {nurse.name} একজন {categoryLabel(nurse.category)} নার্স হিসেবে কর্মরত আছেন।{' '}
-                        {nurse.hospitalName
-                            ? `${nurse.hospitalName}-এ তার দীর্ঘ অভিজ্ঞতা রয়েছে। `
+                        {nurse.name} একজন {categoryLabel(nurse.categoryCode)} নার্স হিসেবে
+                        কর্মরত আছেন।{' '}
+                        {nurse.hospitalId
+                            ? `${nurse.hospitalId}-এ তার দীর্ঘ অভিজ্ঞতা রয়েছে। `
                             : 'তিনি স্বাধীনভাবে রোগী সেবা প্রদান করেন। '}
                         রোগীর যত্ন, ঔষধ ব্যবস্থাপনা এবং জরুরি সেবায় তিনি দক্ষ। বর্তমানে{' '}
-                        <span className={nurse.isAvailable ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
+                        <span
+                            className={
+                                nurse.isAvailable
+                                    ? 'text-green-600 dark:text-green-400 font-semibold'
+                                    : 'text-red-600 dark:text-red-400 font-semibold'
+                            }
+                        >
                             {nurse.isAvailable ? 'সেবা প্রদানে উপলব্ধ' : 'ব্যস্ত রয়েছেন'}
                         </span>
                         ।
@@ -172,7 +221,7 @@ export default function NurseDetailsPage() {
                 </div>
             </div>
 
-            {/* ─────────────── Booking Modal ─────────────── */}
+            {/* Modal */}
             <QuickBookingModal
                 nurse={selectedNurse}
                 onClose={() => setSelectedNurse(null)}
@@ -182,7 +231,7 @@ export default function NurseDetailsPage() {
 }
 
 // ─────────────────────────────────────────────
-// Info Row sub-component
+// Info Row
 // ─────────────────────────────────────────────
 function InfoRow({
     icon,
@@ -216,9 +265,9 @@ function InfoRow({
 }
 
 // ─────────────────────────────────────────────
-// Category label helper
+// Category label
 // ─────────────────────────────────────────────
-function categoryLabel(cat: string) {
+function categoryLabel(cat?: string) {
     switch (cat) {
         case 'Hospital-Affiliated':
             return 'হাসপাতাল-সংযুক্ত';
@@ -227,6 +276,6 @@ function categoryLabel(cat: string) {
         case 'Independent':
             return 'স্বাধীন';
         default:
-            return cat;
+            return cat ?? 'নার্স';
     }
 }

@@ -1,17 +1,20 @@
-// next.config.ts
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
+      // ─── Supabase Storage (nurse images) ───
+      {
+        protocol: 'https',
+        hostname: 'zwcfqjnngejtbfefvpzl.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      // ─── Fallback avatar ───
       {
         protocol: 'https',
         hostname: 'i.pravatar.cc',
         pathname: '/**',
       },
-      // Add any other image hosts you use later, e.g.:
-      // { protocol: 'https', hostname: 'images.unsplash.com' },
-      // { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
   },
 };

@@ -28,6 +28,27 @@ export interface CreateNurseInput {
     isApproved?: boolean;
 }
 
+export interface CreateAdminInput {
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: 'operations_admin' | 'super_admin';
+  adminCode: string;
+}
+
+export interface IDatabaseAdapter {
+    // ... existing
+
+    // ─── Storage ───
+    uploadFile(
+        bucket: string,
+        path: string,
+        file: File
+    ): Promise<{ url: string; path: string }>;
+
+    deleteFile(bucket: string, path: string): Promise<void>;
+}
+
 export interface IDatabaseAdapter {
     // ─── Health ───
     ping(): Promise<boolean>;
@@ -74,6 +95,7 @@ export interface IDatabaseAdapter {
     ): Promise<Nurse>;
     approveNurse(id: string, adminId: string): Promise<void>;
     deleteNurse(id: string, adminId: string): Promise<void>;
+  getNurseBookings(nurseId: string): Promise<Booking[]>;
 
     // ─── Categories ───
     getCategories(): Promise<any[]>;
@@ -81,4 +103,6 @@ export interface IDatabaseAdapter {
     // ─── Admins ───
     getAdminByEmail(email: string): Promise<Admin | null>;
     getAdminById(id: string): Promise<Admin | null>;
+  createAdmin(data: CreateAdminInput): Promise<Admin>;
+  generateAdminCode(prefix: string): Promise<string>;
 }

@@ -4,6 +4,7 @@ import {
     IDatabaseAdapter,
     CreateCustomerInput,
     CreateNurseInput,
+    CreateAdminInput,
 } from './types';
 
 // ─────────────────────────────────────────────
@@ -205,9 +206,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
             .eq('id', id);
     }
 
-    // ═══════════════════════════════════════════
-    // Admin — All Data
-    // ═══════════════════════════════════════════
     async getAllCustomers(): Promise<Customer[]> {
         const { data, error } = await this.client
             .from('customers')
@@ -216,16 +214,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
 
         if (error || !data) return [];
         return (data as CustomerRow[]).map((row) => this.mapCustomerRow(row));
-    }
-
-    async getAllBookings(): Promise<Booking[]> {
-        const { data, error } = await this.client
-            .from('bookings')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (error || !data) return [];
-        return (data as BookingRow[]).map((row) => this.mapBookingRow(row));
     }
 
     // ═══════════════════════════════════════════
@@ -284,6 +272,27 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         return this.mapBookingRow(data as BookingRow);
     }
 
+    async getAllBookings(): Promise<Booking[]> {
+        const { data, error } = await this.client
+            .from('bookings')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return [];
+        return (data as BookingRow[]).map((row) => this.mapBookingRow(row));
+    }
+
+    async getNurseBookings(nurseId: string): Promise<Booking[]> {
+        const { data, error } = await this.client
+            .from('bookings')
+            .select('*')
+            .eq('nurse_id', nurseId)
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return [];
+        return (data as BookingRow[]).map((row) => this.mapBookingRow(row));
+    }
+
     // ═══════════════════════════════════════════
     // Hospitals
     // ═══════════════════════════════════════════
@@ -326,8 +335,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
                 email: data.email?.trim() ?? null,
                 website: data.website?.trim() ?? null,
                 is_active: true,
-                created_by: adminId,
-                updated_by: adminId,
             })
             .select()
             .single();
@@ -342,7 +349,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         adminId: string
     ): Promise<Hospital> {
         const updateData: Record<string, unknown> = {
-            updated_by: adminId,
             updated_at: new Date().toISOString(),
         };
 
@@ -374,7 +380,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
             .from('hospitals')
             .update({
                 is_active: false,
-                updated_by: adminId,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', id);
@@ -391,7 +396,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
             .from('hospitals')
             .update({
                 is_active: isActive,
-                updated_by: adminId,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', id);
@@ -446,7 +450,7 @@ export class SupabaseAdapter implements IDatabaseAdapter {
                 email: input.email.toLowerCase().trim(),
                 password_hash: input.passwordHash,
                 category_code: input.categoryCode ?? null,
-                hospital_id: input.hospitalId ?? null,
+                hospital_id: input.hospitalId || null,
                 area: input.area ?? null,
                 address: input.address ?? null,
                 image_url: input.imageUrl ?? null,
@@ -477,7 +481,7 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         if (data.categoryCode !== undefined)
             updateData.category_code = data.categoryCode;
         if (data.hospitalId !== undefined)
-            updateData.hospital_id = data.hospitalId;
+            updateData.hospital_id = data.hospitalId || null;
         if (data.area !== undefined) updateData.area = data.area;
         if (data.address !== undefined) updateData.address = data.address;
         if (data.rating !== undefined) updateData.rating = data.rating;
@@ -485,7 +489,6 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         if (data.isApproved !== undefined) {
             updateData.is_approved = data.isApproved;
             if (data.isApproved) {
-                updateData.approved_by = adminId;
                 updateData.approved_at = new Date().toISOString();
             }
         }
@@ -505,7 +508,16 @@ export class SupabaseAdapter implements IDatabaseAdapter {
     }
 
     async approveNurse(id: string, adminId: string): Promise<void> {
-        await this.updateNurse(id, { isApproved: true }, adminId);
+        const { error } = await this.client
+            .from('nurses')
+            .update({
+                is_approved: true,
+                approved_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+        if (error) throw new Error(error.message);
     }
 
     async deleteNurse(id: string, adminId: string): Promise<void> {
@@ -559,8 +571,74 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         return this.mapAdminRow(data as AdminRow);
     }
 
+    async createAdmin(data: CreateAdminInput): Promise<Admin> {
+        const { data: row, error } = await this.client
+            .from('admins')
+            .insert({
+                admin_code: data.adminCode.toUpperCase().trim(),
+                name: data.name.trim(),
+                email: data.email.toLowerCase().trim(),
+                password_hash: data.passwordHash,
+                role: data.role,
+            })
+            .select()
+            .single();
+
+        if (error) throw new Error(error.message);
+        return this.mapAdminRow(row as AdminRow);
+    }
+
+    async generateAdminCode(prefix: string): Promise<string> {
+        const { data } = await this.client
+            .from('admins')
+            .select('admin_code')
+            .like('admin_code', `${prefix}%`)
+            .order('admin_code', { ascending: false })
+            .limit(1);
+
+        const lastCode = data?.[0]?.admin_code ?? `${prefix}1000`;
+        const num = parseInt(lastCode.replace(prefix, ''), 10) + 1;
+        return `${prefix}${num}`;
+    }
+
     // ═══════════════════════════════════════════
-    // Private helpers
+    // Storage (File Upload)
+    // ═══════════════════════════════════════════
+    async uploadFile(
+        bucket: string,
+        path: string,
+        file: File
+    ): Promise<{ url: string; path: string }> {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const { data, error } = await this.client.storage
+            .from(bucket)
+            .upload(path, buffer, {
+                contentType: file.type,
+                upsert: true,
+                cacheControl: '3600',
+            });
+
+        if (error) throw new Error(error.message);
+
+        const { data: urlData } = this.client.storage
+            .from(bucket)
+            .getPublicUrl(data.path);
+
+        return {
+            url: urlData.publicUrl,
+            path: data.path,
+        };
+    }
+
+    async deleteFile(bucket: string, path: string): Promise<void> {
+        const { error } = await this.client.storage.from(bucket).remove([path]);
+        if (error) throw new Error(error.message);
+    }
+
+    // ═══════════════════════════════════════════
+    // Private helpers — Code generators
     // ═══════════════════════════════════════════
     private async generateCustomerCode(): Promise<string> {
         const { data } = await this.client
@@ -601,6 +679,9 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         return `NUR${num}`;
     }
 
+    // ═══════════════════════════════════════════
+    // Private helpers — Row mappers
+    // ═══════════════════════════════════════════
     private mapAdminRow(row: AdminRow): Admin {
         return {
             id: row.id,
