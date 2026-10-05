@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { STATIC_NURSES } from '@/data/nurses';
 import { Nurse } from '@/types';
 import QuickBookingModal from '@/components/QuickBookingModal';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -13,30 +12,41 @@ export default function NurseDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
+    const [nurse, setNurse] = useState<Nurse | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    // Static data থেকে nurse খুঁজুন
-    const staticNurse = STATIC_NURSES.find((n) => n.id === params.id);
+    // ── Load nurse from API ──
+    useEffect(() => {
+        async function load() {
+            try {
+                const res = await fetch('/api/nurses');
+                const data = await res.json();
 
-    // StaticNurse → Nurse type-এ convert
-    const nurse: Nurse | null = staticNurse
-        ? {
-            id: staticNurse.id,
-            nurseCode: staticNurse.id,
-            name: staticNurse.name,
-            phone: staticNurse.phone,
-            email: '',
-            categoryCode: staticNurse.category,
-            hospitalId: staticNurse.hospitalName,
-            area: staticNurse.area,
-            address: staticNurse.address,
-            rating: staticNurse.rating,
-            imageUrl: staticNurse.image,
-            isApproved: true,
-            isAvailable: staticNurse.isAvailable,
-            isActive: true,
-            createdAt: new Date().toISOString(),
+                const found = (data.nurses ?? []).find(
+                    (n: Nurse) => n.id === params.id
+                );
+
+                setNurse(found ?? null);
+            } catch (err) {
+                console.error('Load error:', err);
+            } finally {
+                setLoading(false);
+            }
         }
-        : null;
+        load();
+    }, [params.id]);
+
+    // ── Loading ──
+    if (loading) {
+        return (
+            <main className="max-w-4xl mx-auto p-4 min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <p className="text-sm text-gray-500">লোড হচ্ছে...</p>
+                </div>
+            </main>
+        );
+    }
 
     // ── Not found ──
     if (!nurse) {
@@ -47,8 +57,8 @@ export default function NurseDetailsPage() {
                     <h1 className="text-2xl font-bold mb-2">নার্স খুঁজে পাওয়া যায়নি</h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                         আইডি:{' '}
-                        <code className="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
-                            {String(params.id)}
+                        <code className="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-xs">
+                            {String(params.id).slice(0, 20)}...
                         </code>
                     </p>
                     <Link
@@ -86,8 +96,7 @@ export default function NurseDetailsPage() {
                     <div className="relative w-full aspect-square md:aspect-auto md:min-h-[320px] bg-gray-100 dark:bg-gray-800">
                         <Image
                             src={
-                                nurse.imageUrl ||
-                                `https://i.pravatar.cc/150?u=${nurse.id}`
+                                nurse.imageUrl || `https://i.pravatar.cc/150?u=${nurse.id}`
                             }
                             alt={nurse.name}
                             fill
@@ -108,7 +117,6 @@ export default function NurseDetailsPage() {
                     {/* Right: Info */}
                     <div className="md:col-span-2 p-6 md:p-8 flex flex-col justify-between">
                         <div>
-                            {/* Name + Rating */}
                             <div className="flex justify-between items-start gap-3 mb-3">
                                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
                                     {nurse.name}
@@ -147,14 +155,16 @@ export default function NurseDetailsPage() {
                             </div>
 
                             {/* Address */}
-                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 mb-6">
-                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
-                                    📌 সম্পূর্ণ ঠিকানা
-                                </p>
-                                <p className="text-sm text-gray-700 dark:text-gray-300">
-                                    {nurse.address}
-                                </p>
-                            </div>
+                            {nurse.address && (
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 mb-6">
+                                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                                        📌 সম্পূর্ণ ঠিকানা
+                                    </p>
+                                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                                        {nurse.address}
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Actions */}
@@ -189,7 +199,7 @@ export default function NurseDetailsPage() {
                         {nurse.name} একজন {categoryLabel(nurse.categoryCode)} নার্স হিসেবে
                         কর্মরত আছেন।{' '}
                         {nurse.hospitalId
-                            ? `${nurse.hospitalId}-এ তার দীর্ঘ অভিজ্ঞতা রয়েছে। `
+                            ? `তিনি ${nurse.hospitalId}-এ দীর্ঘ অভিজ্ঞতার সাথে কাজ করছেন। `
                             : 'তিনি স্বাধীনভাবে রোগী সেবা প্রদান করেন। '}
                         রোগীর যত্ন, ঔষধ ব্যবস্থাপনা এবং জরুরি সেবায় তিনি দক্ষ। বর্তমানে{' '}
                         <span
@@ -221,7 +231,7 @@ export default function NurseDetailsPage() {
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Booking Modal */}
             <QuickBookingModal
                 nurse={selectedNurse}
                 onClose={() => setSelectedNurse(null)}
@@ -230,9 +240,9 @@ export default function NurseDetailsPage() {
     );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 // Info Row
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 function InfoRow({
     icon,
     label,
@@ -264,9 +274,9 @@ function InfoRow({
     );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 // Category label
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 function categoryLabel(cat?: string) {
     switch (cat) {
         case 'Hospital-Affiliated':

@@ -378,10 +378,7 @@ export class SupabaseAdapter implements IDatabaseAdapter {
     async deleteHospital(id: string, adminId: string): Promise<void> {
         const { error } = await this.client
             .from('hospitals')
-            .update({
-                is_active: false,
-                updated_at: new Date().toISOString(),
-            })
+            .delete()
             .eq('id', id);
 
         if (error) throw new Error(error.message);
@@ -677,6 +674,28 @@ export class SupabaseAdapter implements IDatabaseAdapter {
         const lastCode = data?.[0]?.nurse_code ?? 'NUR1000';
         const num = parseInt(lastCode.replace('NUR', ''), 10) + 1;
         return `NUR${num}`;
+    }
+
+    // ═══════════════════════════════════════════
+    // Public client getter (for direct queries)
+    // ═══════════════════════════════════════════
+    getClient(): SupabaseClient {
+        return this.client;
+    }
+
+    // ═══════════════════════════════════════════
+    // Update booking status
+    // ═══════════════════════════════════════════
+    async updateBookingStatus(id: string, status: string): Promise<void> {
+        const { error } = await this.client
+            .from('bookings')
+            .update({
+                status,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+        if (error) throw new Error(error.message);
     }
 
     // ═══════════════════════════════════════════

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Nurse } from '@/types';
 import QuickBookingModal from '@/components/QuickBookingModal';
+import NurseLoginModal from '@/components/NurseLoginModal';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useCustomer } from '@/context/CustomerContext';
 import { useNurse } from '@/context/NurseContext';
@@ -17,6 +18,7 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedHospital, setSelectedHospital] = useState<string>('All');
   const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
+  const [nurseModalOpen, setNurseModalOpen] = useState(false);
 
   const { customer } = useCustomer();
   const { nurse: nurseSession } = useNurse();
@@ -40,7 +42,6 @@ export default function HomePage() {
   }, []);
 
   // ── Dynamic filter lists ──
-  // ── Dynamic filter lists ──
   const areaList = useMemo<string[]>(() => {
     const areas = new Set<string>();
     nurses.forEach((n) => {
@@ -50,10 +51,6 @@ export default function HomePage() {
     });
     return ['All', ...Array.from(areas).sort()];
   }, [nurses]);
-
-  
-
-  
 
   const categoryList = useMemo(() => {
     const cats = new Map<string, string>();
@@ -124,7 +121,7 @@ export default function HomePage() {
         <div className="flex items-center gap-2 flex-wrap">
           <ThemeToggle />
 
-          {/* Customer Login */}
+          {/* 1️⃣ Customer Login */}
           {customer ? (
             <Link
               href="/dashboard"
@@ -141,7 +138,7 @@ export default function HomePage() {
             </Link>
           )}
 
-          {/* Nurse Login */}
+          {/* 2️⃣ Nurse Login — Modal Button */}
           {nurseSession ? (
             <Link
               href="/nurse/dashboard"
@@ -150,15 +147,15 @@ export default function HomePage() {
               🧑‍⚕️ {nurseSession.name.split(' ')[0]}
             </Link>
           ) : (
-            <Link
-              href="/nurse/login"
+            <button
+              onClick={() => setNurseModalOpen(true)}
               className="text-xs px-3 py-2 border border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-500 rounded-lg font-medium hover:bg-teal-50 dark:hover:bg-teal-950 transition"
             >
               🧑‍⚕️ নার্স লগইন
-            </Link>
+            </button>
           )}
 
-          {/* Admin Login */}
+          {/* 3️⃣ Admin Login */}
           {admin ? (
             <Link
               href="/admin/dashboard"
@@ -373,7 +370,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Empty */}
+      {/* Empty State */}
       {!loading && filteredNurses.length === 0 && (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
           <p className="text-3xl mb-2">🔍</p>
@@ -390,16 +387,22 @@ export default function HomePage() {
               ✖ সব ফিল্টার মুছুন
             </button>
           ) : (
-            <Link
-              href="/nurse/register"
-              className="inline-block px-5 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition"
-            >
-              🧑‍⚕️ নার্স রেজিস্ট্রেশন করুন
-            </Link>
+            <p className="text-xs text-gray-400">
+              Admin approve করলে নার্স এখানে দেখা যাবে
+            </p>
           )}
         </div>
       )}
 
+      {/* ═══════════════ MODALS ═══════════════ */}
+
+      {/* Nurse Login Modal */}
+      <NurseLoginModal
+        isOpen={nurseModalOpen}
+        onClose={() => setNurseModalOpen(false)}
+      />
+
+      {/* Booking Modal */}
       <QuickBookingModal
         nurse={selectedNurse}
         onClose={() => setSelectedNurse(null)}

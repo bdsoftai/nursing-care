@@ -40,7 +40,7 @@ function DashboardContent() {
 
     const handleLogout = () => {
         logout();
-        router.push('/nurse/login');
+        router.push('/');
     };
 
     const stats = {

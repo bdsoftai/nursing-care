@@ -27,6 +27,13 @@ export interface CreateNurseInput {
     imageUrl?: string;
     isApproved?: boolean;
 }
+export interface IDatabaseAdapter {
+    // ... existing
+
+    // ─── Booking Status ───
+    updateBookingStatus(id: string, status: string): Promise<void>;
+    getClient(): any;
+}
 
 export interface CreateAdminInput {
   name: string;
